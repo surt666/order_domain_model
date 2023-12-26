@@ -3,21 +3,28 @@ use fsm::*;
 use strum::IntoEnumIterator;
 // use strum_macros::EnumIter;
 
-fn aggregate_order(mut events: Vec<OrderEvent>, mut order: Order, machine: &mut StateMachine<State, OrderEvent, Action>) -> Order {
+fn aggregate_order(
+    mut events: Vec<OrderEvent>, mut order: Order, machine: &mut StateMachine<State, OrderEventDiscriminants, Action>,
+) -> Order {
     if events.is_empty() {
         return order;
     }
 
     match events.first().unwrap() {
         OrderEvent::ItemAdded { id, order_id, time } => {
+            println!("ItemAdded");
             order.id = order_id.clone();
             order.items.push(id.clone());
-            machine.update_state(OrderEvent::ItemAdded { id: id.clone(), order_id: order_id.clone(), time: *time });
+            machine.update_state(OrderEventDiscriminants::ItemAdded);
+            let state = machine.current_state();
+            println!("State {:#?}", state.state);
         }
         OrderEvent::ItemDeleted { id, order_id, time } => {
+            println!("ItemDeleted");
             order.id = order_id.clone();
-            machine.update_state(OrderEvent::ItemDeleted { id: id.clone(), order_id: order_id.clone(), time: *time });
+            machine.update_state(OrderEventDiscriminants::ItemDeleted);
             let state = machine.current_state();
+            println!("State {:#?}", state.state);
             match state.state {
                 State::InProgress => {
                     if let Some(pos) = order.items.iter().position(|item_id| item_id == id) {
@@ -33,13 +40,9 @@ fn aggregate_order(mut events: Vec<OrderEvent>, mut order: Order, machine: &mut 
             }
         }
         OrderEvent::OrderPayed { order_id, payment_type, amount, time } => {
+            println!("OrderPayed");
             order.id = order_id.clone();
-            machine.update_state(OrderEvent::OrderPayed {
-                order_id: order_id.clone(),
-                payment_type: *payment_type,
-                amount: *amount,
-                time: *time,
-            });
+            machine.update_state(OrderEventDiscriminants::OrderPayed);
             let state = machine.current_state();
             if state.actions.contains(&Action::PrepareOrder) {
                 order.status = State::Payed;
@@ -49,14 +52,9 @@ fn aggregate_order(mut events: Vec<OrderEvent>, mut order: Order, machine: &mut 
             order.amount = *amount;
         }
         OrderEvent::OrderDetailsAdded { order_id, delivery_type, delivery_address, customer, time } => {
+            println!("OrderDetailsAdded");
             order.id = order_id.clone();
-            machine.update_state(OrderEvent::OrderDetailsAdded {
-                order_id: order_id.clone(),
-                delivery_type: *delivery_type,
-                delivery_address: delivery_address.clone(),
-                customer: customer.clone(),
-                time: *time,
-            });
+            machine.update_state(OrderEventDiscriminants::OrderDetailsAdded);
             order.delivery_type = Some(*delivery_type);
             if delivery_address.is_some() {
                 order.address = delivery_address.clone();
@@ -66,8 +64,9 @@ fn aggregate_order(mut events: Vec<OrderEvent>, mut order: Order, machine: &mut 
             }
         }
         OrderEvent::OrderSent { order_id, time } => {
+            println!("OrderSent");
             order.id = order_id.clone();
-            machine.update_state(OrderEvent::OrderSent { order_id: order_id.clone(), time: *time });
+            machine.update_state(OrderEventDiscriminants::OrderSent);
 
             let state = machine.current_state();
             if state.state == State::Sent {
@@ -79,7 +78,8 @@ fn aggregate_order(mut events: Vec<OrderEvent>, mut order: Order, machine: &mut 
             }
         }
         OrderEvent::OrderDelivered { order_id, time } => {
-            machine.update_state(OrderEvent::OrderDelivered { order_id: order_id.clone(), time: *time });
+            println!("OrderDelivered");
+            machine.update_state(OrderEventDiscriminants::OrderDelivered);
             let state = machine.current_state();
             if state.state == State::Delivered {
                 order.status = State::Delivered;
@@ -90,7 +90,8 @@ fn aggregate_order(mut events: Vec<OrderEvent>, mut order: Order, machine: &mut 
             }
         }
         OrderEvent::OrderDeliveryFailed { order_id, reason, time } => {
-            machine.update_state(OrderEvent::OrderDeliveryFailed { order_id: order_id.clone(), reason: reason.clone(), time: *time });
+            println!("OrderDeliveryFailed");
+            machine.update_state(OrderEventDiscriminants::OrderDeliveryFailed);
 
             let state = machine.current_state();
             if state.actions.contains(&Action::ContactCustomer) {
@@ -104,13 +105,10 @@ fn aggregate_order(mut events: Vec<OrderEvent>, mut order: Order, machine: &mut 
             }
         }
         OrderEvent::CustomerAdded { customer, first_name, last_name, address, time } => {
-            machine.update_state(OrderEvent::CustomerAdded {
-                customer: customer.clone(),
-                first_name: first_name.clone(),
-                last_name: last_name.clone(),
-                address: address.clone(),
-                time: *time,
-            });
+            println!("CustomerAdded");
+            machine.update_state(OrderEventDiscriminants::CustomerAdded);
+            let state = machine.current_state();
+            println!("State {:#?}", state.state);
             if order.address.is_none() {
                 order.address = Some(address.clone());
             }
@@ -135,7 +133,7 @@ mod tests {
         logic::{add_event, aggregate_order},
     };
     use fsm::{StateMachine, StateResult};
-    use std::sync::LazyLock;
+    use std::{borrow::Borrow, sync::LazyLock};
 
     static TRANSITIONS: LazyLock<Vec<Vec<StateResult<State, Action>>>> = LazyLock::new(|| {
         vec![
@@ -152,14 +150,14 @@ mod tests {
             ],
             vec![
                 /* ItemDeleted */
-                StateResult { state: State::Failed, actions: vec![Action::AddItem, Action::DeleteItem] }, //Empty
-                StateResult { state: State::InProgress, actions: vec![] },                                //InProgress
-                StateResult { state: State::Payed, actions: vec![Action::RefundDiff] },                   //Payed
-                StateResult { state: State::PayDiff, actions: vec![Action::Pay] },                        //PayDiff
-                StateResult { state: State::PayDiff, actions: vec![Action::Pay] },                        //Sent
-                StateResult { state: State::PayDiff, actions: vec![Action::Pay] },                        //Delivered
-                StateResult { state: State::PayDiff, actions: vec![Action::Pay] },                        //DeliveryFailed
-                StateResult { state: State::PayDiff, actions: vec![Action::Pay] },                        //Failed
+                StateResult { state: State::Failed, actions: vec![Action::AddItem] }, //Empty
+                StateResult { state: State::InProgress, actions: vec![Action::AddItem, Action::DeleteItem] }, //InProgress
+                StateResult { state: State::Payed, actions: vec![Action::RefundDiff] }, //Payed
+                StateResult { state: State::PayDiff, actions: vec![Action::Pay] },    //PayDiff
+                StateResult { state: State::PayDiff, actions: vec![Action::Pay] },    //Sent
+                StateResult { state: State::PayDiff, actions: vec![Action::Pay] },    //Delivered
+                StateResult { state: State::PayDiff, actions: vec![Action::Pay] },    //DeliveryFailed
+                StateResult { state: State::PayDiff, actions: vec![Action::Pay] },    //Failed
             ],
             vec![
                 /* OrderPayed */
@@ -218,7 +216,7 @@ mod tests {
             ],
             vec![
                 /* CustomerAdded */
-                StateResult { state: State::Failed, actions: vec![] }, //Empty
+                StateResult { state: State::Empty, actions: vec![] },  //Empty
                 StateResult { state: State::Payed, actions: vec![] },  //InProgress
                 StateResult { state: State::Failed, actions: vec![] }, //Payed
                 StateResult { state: State::PayDiff, actions: vec![Action::Pay] }, //PayDiff
@@ -271,7 +269,9 @@ mod tests {
             action: Action::None,
         };
         let events = add_event(OrderEvent::OrderDelivered { order_id: "1234".to_string(), time: 8 }, store_event_dummy);
-        let mut machine = StateMachine::new(State::iter().collect(), OrderEvent::iter().collect(), TRANSITIONS.to_owned());
+        let e = OrderEventDiscriminants::iter().collect();
+        println!("E {:#?}", e);
+        let mut machine = StateMachine::new(State::iter().collect(), e, TRANSITIONS.to_owned());
         assert_eq!(aggregate_order(events, Order::new("1234".to_string()), &mut machine), order);
     }
 
@@ -311,7 +311,7 @@ mod tests {
             OrderEvent::OrderSent { order_id: "1234".to_string(), time: 7 },
             OrderEvent::OrderDelivered { order_id: "1234".to_string(), time: 8 },
         ];
-        let mut machine = StateMachine::new(State::iter().collect(), OrderEvent::iter().collect(), TRANSITIONS.to_owned());
+        let mut machine = StateMachine::new(State::iter().collect(), OrderEventDiscriminants::iter().collect(), TRANSITIONS.to_owned());
         assert_eq!(aggregate_order(events, Order::new("1234".to_string()), &mut machine), order);
     }
 
@@ -348,7 +348,7 @@ mod tests {
                 time: 8,
             },
         ];
-        let mut machine = StateMachine::new(State::iter().collect(), OrderEvent::iter().collect(), TRANSITIONS.to_owned());
+        let mut machine = StateMachine::new(State::iter().collect(), OrderEventDiscriminants::iter().collect(), TRANSITIONS.to_owned());
         assert_eq!(aggregate_order(events, Order::new("1234".to_string()), &mut machine), order);
     }
 }

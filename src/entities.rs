@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 
 // use strum::IntoEnumIterator;
-use strum_macros::EnumIter;
+use strum_macros::{EnumDiscriminants, EnumIter};
 
 pub type OrderId = String;
 pub type OrderItemId = String;
@@ -23,7 +23,8 @@ pub enum DeliveryType {
     BRING,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, EnumIter)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, EnumDiscriminants)]
+#[strum_discriminants(derive(EnumIter))]
 pub enum OrderEvent {
     ItemAdded {
         id: OrderItemId,
