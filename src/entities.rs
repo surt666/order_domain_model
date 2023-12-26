@@ -1,24 +1,29 @@
 use std::cmp::Ordering;
 
+// use strum::IntoEnumIterator;
+use strum_macros::EnumIter;
+
 pub type OrderId = String;
 pub type OrderItemId = String;
 pub type CustomerId = String;
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Default)]
 pub enum PaymentType {
+    #[default]
     VISA,
     MASTERCARD,
     AMERICANEXPRESS,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Default)]
 pub enum DeliveryType {
+    #[default]
     GLS,
     UPS,
     BRING,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, EnumIter)]
 pub enum OrderEvent {
     ItemAdded {
         id: OrderItemId,
@@ -87,8 +92,10 @@ impl Ord for OrderEvent {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub enum Status {
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Default, EnumIter)]
+pub enum State {
+    #[default]
+    Empty,
     InProgress,
     Payed,
     PayDiff,
@@ -98,34 +105,40 @@ pub enum Status {
     Failed,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Default)]
 pub enum CountryCode {
+    #[default]
     DK,
     US,
     DE,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Default)]
 pub enum ReasonCode {
+    #[default]
     PackageLost,
     WrongAddress,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Default)]
 pub struct Reason {
     pub reason_code: ReasonCode,
     pub reason_message: String,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, EnumIter)]
 pub enum Action {
     None,
+    AddItem,
+    DeleteItem,
+    Pay,
+    RefundDiff,
     ContactCustomer,
     PrepareOrder,
     CheckOrder,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Default)]
 pub struct Address {
     pub street: &'static str,
     pub house_number: i16,
@@ -136,7 +149,7 @@ pub struct Address {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Order {
     pub id: OrderId,
-    pub status: Status,
+    pub status: State,
     pub payment_type: Option<PaymentType>,
     pub amount: u32,
     pub delivery_type: Option<DeliveryType>,
@@ -150,7 +163,7 @@ impl Order {
     pub fn new(id: String) -> Order {
         Order {
             id,
-            status: Status::InProgress,
+            status: State::Empty,
             items: vec![],
             address: None,
             customer: None,

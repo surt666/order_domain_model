@@ -1,3 +1,4 @@
+#![feature(lazy_cell)]
 mod entities;
 mod infra;
 mod logic;
