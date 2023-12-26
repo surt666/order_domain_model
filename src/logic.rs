@@ -67,8 +67,8 @@ fn aggregate_order(
             println!("OrderSent");
             order.id = order_id.clone();
             machine.update_state(OrderEventDiscriminants::OrderSent);
-
             let state = machine.current_state();
+            println!("State {:#?}", state.state);
             if state.state == State::Sent {
                 order.status = State::Sent;
                 order.action = Action::None;
@@ -81,6 +81,7 @@ fn aggregate_order(
             println!("OrderDelivered");
             machine.update_state(OrderEventDiscriminants::OrderDelivered);
             let state = machine.current_state();
+            println!("State {:#?}", state.state);
             if state.state == State::Delivered {
                 order.status = State::Delivered;
                 order.action = Action::None;
@@ -92,16 +93,16 @@ fn aggregate_order(
         OrderEvent::OrderDeliveryFailed { order_id, reason, time } => {
             println!("OrderDeliveryFailed");
             machine.update_state(OrderEventDiscriminants::OrderDeliveryFailed);
-
             let state = machine.current_state();
+            println!("State {:#?}", state.state);
             if state.actions.contains(&Action::ContactCustomer) {
                 order.action = Action::ContactCustomer;
-                if let State::DeliveryFailed = state.state {
-                    order.status = State::DeliveryFailed
-                } else {
-                    order.status = State::Failed;
-                    order.action = Action::CheckOrder;
-                }
+            }
+            if State::DeliveryFailed == state.state {
+                order.status = State::DeliveryFailed
+            } else {
+                order.status = State::Failed;
+                order.action = Action::CheckOrder;
             }
         }
         OrderEvent::CustomerAdded { customer, first_name, last_name, address, time } => {
@@ -135,6 +136,18 @@ mod tests {
     use fsm::{StateMachine, StateResult};
     use std::{borrow::Borrow, sync::LazyLock};
 
+    /*
+    events/state        | Empty      | InProgress | Payed                    | Sent                      | Delivered  | PayDiff  | DeliveryFailed | Failed |
+    ItemAdded           | InProgress | InProgress | PayDiff                  | Failed                    | Failed     | PayDiff  | Failed         | Failed |
+    ItemDeleted         | Failed     | InProgress | Payed [RefundDiff]       | Failed                    | Failed     | PayDiff  | Failed         | Failed |
+    OrderPayed          | Failed     | Payed      | Failed                   | Failed                    | Failed     | Payed    | Failed         | Failed |
+    OrderDetailsAdded   | InProgress | InProgress | Failed                   | Failed                    | Failed     | Failed   | Failed         | Failed |
+    OrderSent           | Failed     | Failed     | Sent                     | Failed                    | Failed     | Failed   | Failed         | Failed |
+    OrderDelivered      | Failed     | Failed     | Failed                   | Delivered                 | Failed     | Failed   | Failed         | Failed |
+    OrderDeliveryFailed | Failed     | Failed     | Failed                   | DeliveryFailed [ContactCustomer]   | Failed     | Failed   | Failed         | Failed |
+    CustomerAdded       | InProgress | InProgress | Failed                   | Failed                    | Failed     | Failed   | Failed         | Failed |
+    */
+
     static TRANSITIONS: LazyLock<Vec<Vec<StateResult<State, Action>>>> = LazyLock::new(|| {
         vec![
             vec![
@@ -143,10 +156,10 @@ mod tests {
                 StateResult { state: State::InProgress, actions: vec![Action::AddItem, Action::DeleteItem] }, //InProgress
                 StateResult { state: State::PayDiff, actions: vec![Action::Pay] },                            //Payed
                 StateResult { state: State::PayDiff, actions: vec![Action::Pay] },                            //PayDiff
-                StateResult { state: State::PayDiff, actions: vec![Action::Pay] },                            //Sent
-                StateResult { state: State::PayDiff, actions: vec![Action::Pay] },                            //Delivered
-                StateResult { state: State::PayDiff, actions: vec![Action::Pay] },                            //DeliveryFailed
-                StateResult { state: State::PayDiff, actions: vec![Action::Pay] },                            //Failed
+                StateResult { state: State::Failed, actions: vec![] },                                        //Sent
+                StateResult { state: State::Failed, actions: vec![] },                                        //Delivered
+                StateResult { state: State::Failed, actions: vec![] },                                        //DeliveryFailed
+                StateResult { state: State::Failed, actions: vec![] },                                        //Failed
             ],
             vec![
                 /* ItemDeleted */
@@ -154,76 +167,76 @@ mod tests {
                 StateResult { state: State::InProgress, actions: vec![Action::AddItem, Action::DeleteItem] }, //InProgress
                 StateResult { state: State::Payed, actions: vec![Action::RefundDiff] }, //Payed
                 StateResult { state: State::PayDiff, actions: vec![Action::Pay] },    //PayDiff
-                StateResult { state: State::PayDiff, actions: vec![Action::Pay] },    //Sent
-                StateResult { state: State::PayDiff, actions: vec![Action::Pay] },    //Delivered
-                StateResult { state: State::PayDiff, actions: vec![Action::Pay] },    //DeliveryFailed
-                StateResult { state: State::PayDiff, actions: vec![Action::Pay] },    //Failed
+                StateResult { state: State::Failed, actions: vec![] },                //Sent
+                StateResult { state: State::Failed, actions: vec![] },                //Delivered
+                StateResult { state: State::Failed, actions: vec![] },                //DeliveryFailed
+                StateResult { state: State::Failed, actions: vec![] },                //Failed
             ],
             vec![
                 /* OrderPayed */
                 StateResult { state: State::Failed, actions: vec![] }, //Empty
                 StateResult { state: State::Payed, actions: vec![] },  //InProgress
                 StateResult { state: State::Failed, actions: vec![] }, //Payed
-                StateResult { state: State::PayDiff, actions: vec![Action::Pay] }, //PayDiff
-                StateResult { state: State::PayDiff, actions: vec![Action::Pay] }, //Sent
-                StateResult { state: State::PayDiff, actions: vec![Action::Pay] }, //Delivered
-                StateResult { state: State::PayDiff, actions: vec![Action::Pay] }, //DeliveryFailed
-                StateResult { state: State::PayDiff, actions: vec![Action::Pay] }, //Failed
+                StateResult { state: State::Payed, actions: vec![] },  //PayDiff
+                StateResult { state: State::Failed, actions: vec![] }, //Sent
+                StateResult { state: State::Failed, actions: vec![] }, //Delivered
+                StateResult { state: State::Failed, actions: vec![] }, //DeliveryFailed
+                StateResult { state: State::Failed, actions: vec![] }, //Failed
             ],
             vec![
                 /* OrderDetailsAdded */
-                StateResult { state: State::Failed, actions: vec![] }, //Empty
-                StateResult { state: State::Payed, actions: vec![] },  //InProgress
-                StateResult { state: State::Failed, actions: vec![] }, //Payed
-                StateResult { state: State::PayDiff, actions: vec![Action::Pay] }, //PayDiff
-                StateResult { state: State::PayDiff, actions: vec![Action::Pay] }, //Sent
-                StateResult { state: State::PayDiff, actions: vec![Action::Pay] }, //Delivered
-                StateResult { state: State::PayDiff, actions: vec![Action::Pay] }, //DeliveryFailed
-                StateResult { state: State::PayDiff, actions: vec![Action::Pay] }, //Failed
+                StateResult { state: State::InProgress, actions: vec![Action::AddItem, Action::DeleteItem] }, //Empty
+                StateResult { state: State::InProgress, actions: vec![Action::AddItem, Action::DeleteItem] }, //InProgress
+                StateResult { state: State::Failed, actions: vec![] },                                        //Payed
+                StateResult { state: State::Failed, actions: vec![] },                                        //PayDiff
+                StateResult { state: State::Failed, actions: vec![] },                                        //Sent
+                StateResult { state: State::Failed, actions: vec![] },                                        //Delivered
+                StateResult { state: State::Failed, actions: vec![] },                                        //DeliveryFailed
+                StateResult { state: State::Failed, actions: vec![] },                                        //Failed
             ],
             vec![
                 /* OrderSent */
                 StateResult { state: State::Failed, actions: vec![] }, //Empty
-                StateResult { state: State::Payed, actions: vec![] },  //InProgress
-                StateResult { state: State::Failed, actions: vec![] }, //Payed
-                StateResult { state: State::PayDiff, actions: vec![Action::Pay] }, //PayDiff
-                StateResult { state: State::PayDiff, actions: vec![Action::Pay] }, //Sent
-                StateResult { state: State::PayDiff, actions: vec![Action::Pay] }, //Delivered
-                StateResult { state: State::PayDiff, actions: vec![Action::Pay] }, //DeliveryFailed
-                StateResult { state: State::PayDiff, actions: vec![Action::Pay] }, //Failed
+                StateResult { state: State::Failed, actions: vec![] }, //InProgress
+                StateResult { state: State::Sent, actions: vec![] },   //Payed
+                StateResult { state: State::Failed, actions: vec![] }, //PayDiff
+                StateResult { state: State::Failed, actions: vec![] }, //Sent
+                StateResult { state: State::Failed, actions: vec![] }, //Delivered
+                StateResult { state: State::Failed, actions: vec![] }, //DeliveryFailed
+                StateResult { state: State::Failed, actions: vec![] }, //Failed
             ],
             vec![
                 /* OrderDelivered */
-                StateResult { state: State::Failed, actions: vec![] }, //Empty
-                StateResult { state: State::Payed, actions: vec![] },  //InProgress
-                StateResult { state: State::Failed, actions: vec![] }, //Payed
-                StateResult { state: State::PayDiff, actions: vec![Action::Pay] }, //PayDiff
-                StateResult { state: State::PayDiff, actions: vec![Action::Pay] }, //Sent
-                StateResult { state: State::PayDiff, actions: vec![Action::Pay] }, //Delivered
-                StateResult { state: State::PayDiff, actions: vec![Action::Pay] }, //DeliveryFailed
-                StateResult { state: State::PayDiff, actions: vec![Action::Pay] }, //Failed
+                StateResult { state: State::Failed, actions: vec![] },    //Empty
+                StateResult { state: State::Failed, actions: vec![] },    //InProgress
+                StateResult { state: State::Failed, actions: vec![] },    //Payed
+                StateResult { state: State::Failed, actions: vec![] },    //PayDiff
+                StateResult { state: State::Delivered, actions: vec![] }, //Sent
+                StateResult { state: State::Failed, actions: vec![] },    //Delivered
+                StateResult { state: State::Failed, actions: vec![] },    //DeliveryFailed
+                StateResult { state: State::Failed, actions: vec![] },    //Failed
             ],
             vec![
                 /* OrderDeliveryFailed */
                 StateResult { state: State::Failed, actions: vec![] }, //Empty
-                StateResult { state: State::Payed, actions: vec![] },  //InProgress
+                StateResult { state: State::Failed, actions: vec![] }, //InProgress
                 StateResult { state: State::Failed, actions: vec![] }, //Payed
-                StateResult { state: State::PayDiff, actions: vec![Action::Pay] }, //PayDiff
-                StateResult { state: State::PayDiff, actions: vec![Action::Pay] }, //Sent
-                StateResult { state: State::PayDiff, actions: vec![Action::Pay] }, //Delivered
-                StateResult { state: State::PayDiff, actions: vec![Action::Pay] }, //DeliveryFailed
-                StateResult { state: State::PayDiff, actions: vec![Action::Pay] }, //Failed
+                StateResult { state: State::Failed, actions: vec![] }, //PayDiff
+                StateResult { state: State::DeliveryFailed, actions: vec![Action::ContactCustomer] }, //Sent
+                StateResult { state: State::Failed, actions: vec![] }, //Delivered
+                StateResult { state: State::Failed, actions: vec![] }, //DeliveryFailed
+                StateResult { state: State::Failed, actions: vec![] }, //Failed
             ],
             vec![
                 /* CustomerAdded */
-                StateResult { state: State::Empty, actions: vec![] },  //Empty
-                StateResult { state: State::Payed, actions: vec![] },  //InProgress
-                StateResult { state: State::Failed, actions: vec![] }, //Payed
-                StateResult { state: State::PayDiff, actions: vec![Action::Pay] }, //PayDiff
-                StateResult { state: State::PayDiff, actions: vec![Action::Pay] }, //Sent
-                StateResult { state: State::PayDiff, actions: vec![Action::Pay] }, //Delivered
-                StateResult { state: State::PayDiff, actions: vec![Action::Pay] }, //DeliveryFailed
-                StateResult { state: State::PayDiff, actions: vec![Action::Pay] }, //Failed
+                StateResult { state: State::InProgress, actions: vec![Action::AddItem, Action::DeleteItem] }, //Empty
+                StateResult { state: State::InProgress, actions: vec![Action::AddItem, Action::DeleteItem] }, //InProgress
+                StateResult { state: State::Failed, actions: vec![] },                                        //Payed
+                StateResult { state: State::Failed, actions: vec![] },                                        //PayDiff
+                StateResult { state: State::Failed, actions: vec![] },                                        //Sent
+                StateResult { state: State::Failed, actions: vec![] },                                        //Delivered
+                StateResult { state: State::Failed, actions: vec![] },                                        //DeliveryFailed
+                StateResult { state: State::Failed, actions: vec![] },                                        //Failed
             ],
         ]
     });
@@ -269,9 +282,7 @@ mod tests {
             action: Action::None,
         };
         let events = add_event(OrderEvent::OrderDelivered { order_id: "1234".to_string(), time: 8 }, store_event_dummy);
-        let e = OrderEventDiscriminants::iter().collect();
-        println!("E {:#?}", e);
-        let mut machine = StateMachine::new(State::iter().collect(), e, TRANSITIONS.to_owned());
+        let mut machine = StateMachine::new(State::iter().collect(), OrderEventDiscriminants::iter().collect(), TRANSITIONS.to_owned());
         assert_eq!(aggregate_order(events, Order::new("1234".to_string()), &mut machine), order);
     }
 
