@@ -7,7 +7,7 @@ pub type OrderId = String;
 pub type OrderItemId = String;
 pub type CustomerId = String;
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Default)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Default, Hash)]
 pub enum PaymentType {
     #[default]
     VISA,
@@ -15,7 +15,7 @@ pub enum PaymentType {
     AMERICANEXPRESS,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Default)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Default, Hash)]
 pub enum DeliveryType {
     #[default]
     GLS,
@@ -24,7 +24,7 @@ pub enum DeliveryType {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, EnumDiscriminants)]
-#[strum_discriminants(derive(EnumIter))]
+#[strum_discriminants(derive(EnumIter, Hash))]
 pub enum OrderEvent {
     ItemAdded {
         id: OrderItemId,
@@ -93,7 +93,7 @@ impl Ord for OrderEvent {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Default, EnumIter)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Default, EnumIter, Hash)]
 pub enum State {
     #[default]
     Empty,
@@ -106,7 +106,7 @@ pub enum State {
     Failed,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Default)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Default, Hash)]
 pub enum CountryCode {
     #[default]
     DK,
@@ -114,21 +114,22 @@ pub enum CountryCode {
     DE,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Default)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Default, Hash)]
 pub enum ReasonCode {
     #[default]
     PackageLost,
     WrongAddress,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Default, Hash)]
 pub struct Reason {
     pub reason_code: ReasonCode,
     pub reason_message: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, EnumIter)]
+#[derive(Debug, Clone, PartialEq, Eq, EnumIter, Default)]
 pub enum Action {
+    #[default]
     None,
     AddItem,
     DeleteItem,
@@ -139,7 +140,7 @@ pub enum Action {
     CheckOrder,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Default, Hash)]
 pub struct Address {
     pub street: &'static str,
     pub house_number: i16,
