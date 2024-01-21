@@ -1,7 +1,8 @@
 use std::cmp::Ordering;
 
-// use strum::IntoEnumIterator;
+use strum::IntoEnumIterator;
 use strum_macros::{EnumDiscriminants, EnumIter};
+use OrderEvent::{CustomerAdded, ItemAdded, ItemDeleted, OrderDelivered, OrderDeliveryFailed, OrderDetailsAdded, OrderPayed, OrderSent};
 
 pub type OrderId = String;
 pub type OrderItemId = String;
@@ -10,17 +11,17 @@ pub type CustomerId = String;
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Default, Hash)]
 pub enum PaymentType {
     #[default]
-    VISA,
-    MASTERCARD,
-    AMERICANEXPRESS,
+    Visa,
+    Mastercard,
+    Americanexpress,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Default, Hash)]
 pub enum DeliveryType {
     #[default]
-    GLS,
-    UPS,
-    BRING,
+    Gls,
+    Ups,
+    Bring,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, EnumDiscriminants)]
@@ -75,8 +76,7 @@ pub enum OrderEvent {
 impl Ord for OrderEvent {
     fn cmp(&self, other: &Self) -> Ordering {
         println!("ORD");
-        use OrderEvent::*;
-        let get_time = |event: &OrderEvent| -> u32 {
+        let get_time = |event: &Self| -> u32 {
             match event {
                 ItemAdded { time, .. }
                 | ItemDeleted { time, .. }
@@ -109,9 +109,9 @@ pub enum State {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Default, Hash)]
 pub enum CountryCode {
     #[default]
-    DK,
-    US,
-    DE,
+    Dk,
+    Us,
+    De,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Default, Hash)]
@@ -148,7 +148,7 @@ pub struct Address {
     pub country: CountryCode,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Order {
     pub id: OrderId,
     pub status: State,
@@ -162,8 +162,8 @@ pub struct Order {
 }
 
 impl Order {
-    pub fn new(id: String) -> Order {
-        Order {
+    pub fn new(id: String) -> Self {
+        Self {
             id,
             status: State::Empty,
             items: vec![],
